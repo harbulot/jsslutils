@@ -262,6 +262,8 @@ public class X509SSLContextFactory extends DefaultSSLContextFactory {
                         .getProperty(KEYSTORE_PROVIDER_ARGTEXT_PROP));
                 this.keyStore = ksl.loadKeyStore();
             }
+            
+            setKeyPassword(properties.getProperty(KEY_PASSWORD_PROP));
 
             if (getTrustStore() == null) {
                 KeyStoreLoader ksl = new KeyStoreLoader();
@@ -334,6 +336,16 @@ public class X509SSLContextFactory extends DefaultSSLContextFactory {
      */
     protected KeyStore getTrustStore() {
         return this.trustStore;
+    }
+    
+    /**
+     * Sets the key password
+     * 
+     * @param keyPassword
+     */
+    public void setKeyPassword(String keyPassword) {
+        setKeyPassword(
+                (keyPassword != null) ? keyPassword.toCharArray() : null);
     }
 
     /**
