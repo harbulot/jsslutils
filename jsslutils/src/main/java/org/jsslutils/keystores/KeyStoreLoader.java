@@ -390,9 +390,10 @@ public final class KeyStoreLoader {
             }
             InputStream keyStoreInputStream = this.keyStoreInputStream;
             try {
-                keyStoreInputStream = (!"NONE".equals(this.keyStorePath)) ? new FileInputStream(
-                        this.keyStorePath)
-                        : null;
+                if (keyStoreInputStream == null) {
+                    keyStoreInputStream = new FileInputStream(
+                            this.keyStorePath);
+                }
                 if (password == null) {
                     password = this.keyStorePassword;
                 }
