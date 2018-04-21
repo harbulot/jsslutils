@@ -60,6 +60,8 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.net.ssl.CertPathTrustManagerParameters;
 import javax.net.ssl.ManagerFactoryParameters;
@@ -81,6 +83,8 @@ import javax.net.ssl.TrustManagerFactory;
  * 
  */
 public class PKIXSSLContextFactory extends X509SSLContextFactory {
+    private final static Logger LOGGER = Logger.getLogger(PKIXSSLContextFactory.class.getCanonicalName());
+    
     public final static String CRL_RELOAD_INTERVAL_PROP = "org.jsslutils.prop.crlReloadInterval";
 
     protected boolean enableRevocation;
@@ -361,13 +365,22 @@ public class PKIXSSLContextFactory extends X509SSLContextFactory {
      * @throws MalformedURLException
      * @throws IOException
      */
-    public void addCrl(String crlUrl, long reloadInterval)
+    public void addCrl(final String crlUrl, long reloadInterval)
             throws SSLContextFactoryException, MalformedURLException,
             IOException {
         if (reloadInterval > 0) {
-            Callable<X509CRL> reloader = addReloadableCrl(crlUrl);
-            crlReloaderScheduledThreadPoolExecutor.schedule(reloader,
-                    reloadInterval, TimeUnit.SECONDS);
+            final Callable<X509CRL> reloaderCallable = addReloadableCrl(crlUrl);
+            Runnable reloader = new Runnable() {
+                public void run() {
+                    try {
+                        reloaderCallable.call();
+                    } catch (Exception e) {
+                        LOGGER.log(Level.WARNING, "Unable to reload CRL.", e);
+                    }
+                }
+            };
+            crlReloaderScheduledThreadPoolExecutor.scheduleAtFixedRate(reloader,
+                    0L, reloadInterval, TimeUnit.SECONDS);
         } else {
             this.crlCollection.add(loadCrl(crlUrl));
         }

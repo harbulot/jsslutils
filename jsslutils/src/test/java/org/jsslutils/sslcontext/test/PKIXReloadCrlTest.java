@@ -239,9 +239,13 @@ public class PKIXReloadCrlTest extends MiniSslClientServer {
                 .generateCRL(new ByteArrayInputStream(crl.getEncoded()));
     }
 
-    public synchronized static InputStream getCrlInputStream()
+    private synchronized static InputStream getCrlInputStream()
             throws Exception {
         return new ByteArrayInputStream(crl.getEncoded());
+    }
+    
+    private synchronized static void setCrl(X509CRL crl) {
+        PKIXReloadCrlTest.crl = crl;
     }
 
     @Before
@@ -431,12 +435,11 @@ public class PKIXReloadCrlTest extends MiniSslClientServer {
     public void testWithRemoteCrlPermanentlyCached() throws Exception {
         X509CRL crl = generateCRL(caName, Arrays.asList(new BigInteger[] {}),
                 caPublicKey, caPrivateKey);
-        synchronized (PKIXReloadCrlTest.class) {
-            PKIXReloadCrlTest.crl = crl;
-        }
+        setCrl(crl);
 
         serverSSLContextFactory = new PKIXSSLContextFactory(serverKeyStore,
                 MiniSslClientServer.KEYSTORE_PASSWORD, caKeyStore, true);
+        // In this case, the CRL will only be loaded once.
         serverSSLContextFactory.addCrl("http://localhost.example/crl");
 
         clientSSLContextFactory = new PKIXSSLContextFactory(client1KeyStore,
@@ -452,11 +455,11 @@ public class PKIXReloadCrlTest extends MiniSslClientServer {
         crl = generateCRL(caName, Arrays.asList(
                 new BigInteger[] { client2Certificate.getSerialNumber() }),
                 caPublicKey, caPrivateKey);
-        synchronized (PKIXReloadCrlTest.class) {
-            PKIXReloadCrlTest.crl = crl;
-        }
+        setCrl(crl);
+        // Because the CRL is only loaded once, changing the CRL here will have
+        // no effect.
 
-        Thread.sleep(5000);
+        Thread.sleep(3000);
         clientSSLContextFactory = new PKIXSSLContextFactory(client1KeyStore,
                 MiniSslClientServer.KEYSTORE_PASSWORD, caKeyStore, true);
         assertTrue("Loaded keystore", true);
@@ -472,13 +475,11 @@ public class PKIXReloadCrlTest extends MiniSslClientServer {
     public void testWithRemoteCrlReloaded() throws Exception {
         X509CRL crl = generateCRL(caName, Arrays.asList(new BigInteger[] {}),
                 caPublicKey, caPrivateKey);
-        synchronized (PKIXReloadCrlTest.class) {
-            PKIXReloadCrlTest.crl = crl;
-        }
+        setCrl(crl);
 
         serverSSLContextFactory = new PKIXSSLContextFactory(serverKeyStore,
                 MiniSslClientServer.KEYSTORE_PASSWORD, caKeyStore, true);
-        serverSSLContextFactory.addCrl("http://localhost.example/crl", 2);
+        serverSSLContextFactory.addCrl("http://localhost.example/crl", 1);
 
         clientSSLContextFactory = new PKIXSSLContextFactory(client1KeyStore,
                 MiniSslClientServer.KEYSTORE_PASSWORD, caKeyStore, true);
@@ -493,11 +494,9 @@ public class PKIXReloadCrlTest extends MiniSslClientServer {
         crl = generateCRL(caName, Arrays.asList(
                 new BigInteger[] { client2Certificate.getSerialNumber() }),
                 caPublicKey, caPrivateKey);
-        synchronized (PKIXReloadCrlTest.class) {
-            PKIXReloadCrlTest.crl = crl;
-        }
+        setCrl(crl);
 
-        Thread.sleep(5000);
+        Thread.sleep(3000);
         clientSSLContextFactory = new PKIXSSLContextFactory(client1KeyStore,
                 MiniSslClientServer.KEYSTORE_PASSWORD, caKeyStore, true);
         assertTrue("Loaded keystore", true);
@@ -514,14 +513,12 @@ public class PKIXReloadCrlTest extends MiniSslClientServer {
             throws Exception {
         X509CRL crl = generateCRL(caName, Arrays.asList(new BigInteger[] {}),
                 caPublicKey, caPrivateKey);
-        synchronized (PKIXReloadCrlTest.class) {
-            PKIXReloadCrlTest.crl = crl;
-        }
+        setCrl(crl);
 
         PKIXSSLContextFactory serverSSLContextFactory = new PKIXSSLContextFactory(
                 serverKeyStore, MiniSslClientServer.KEYSTORE_PASSWORD,
                 caKeyStore, true);
-        serverSSLContextFactory.addCrl("http://localhost.example/crl", 2);
+        serverSSLContextFactory.addCrl("http://localhost.example/crl", 1);
         SSLContext sslServerContext = serverSSLContextFactory.buildSSLContext();
 
         boolean result = false;
@@ -624,10 +621,8 @@ public class PKIXReloadCrlTest extends MiniSslClientServer {
                         Arrays.asList(new BigInteger[] {
                                 client2Certificate.getSerialNumber() }),
                         caPublicKey, caPrivateKey);
-                synchronized (PKIXReloadCrlTest.class) {
-                    PKIXReloadCrlTest.crl = crl;
-                }
-                Thread.sleep(5000);
+                setCrl(crl);
+                Thread.sleep(3000);
 
                 /*
                  * Test connection 3.
