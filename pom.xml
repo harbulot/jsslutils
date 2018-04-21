@@ -113,7 +113,6 @@
         <module>certificates</module>
         <module>extra/gsi</module>
         <module>extra/apachehttpclient</module>
-        <module>extra/apachetomcat5</module>
         <module>extra/apachetomcat6</module>
         <module>testhelpers</module>
     </modules>
