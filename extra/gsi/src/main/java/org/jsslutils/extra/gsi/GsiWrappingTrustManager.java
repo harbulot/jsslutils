@@ -48,20 +48,21 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.Set;
-import java.util.Vector;
 
 import javax.net.ssl.X509TrustManager;
 
 import org.bouncycastle.asn1.ASN1InputStream;
+import org.bouncycastle.asn1.ASN1Integer;
 import org.bouncycastle.asn1.ASN1Object;
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.ASN1OctetString;
+import org.bouncycastle.asn1.ASN1Primitive;
 import org.bouncycastle.asn1.ASN1Sequence;
-import org.bouncycastle.asn1.DERInteger;
-import org.bouncycastle.asn1.DERObject;
-import org.bouncycastle.asn1.DERObjectIdentifier;
 import org.bouncycastle.asn1.DEROctetString;
-import org.bouncycastle.asn1.x509.X509Name;
-import org.bouncycastle.jce.X509Principal;
+import org.bouncycastle.asn1.x500.AttributeTypeAndValue;
+import org.bouncycastle.asn1.x500.RDN;
+import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x500.style.RFC4519Style;
 import org.jsslutils.sslcontext.X509TrustManagerWrapper;
 
 /**
@@ -193,23 +194,20 @@ public class GsiWrappingTrustManager implements X509TrustManager {
         }
         try {
             X509Certificate proxyCert = chain[0];
-            X509Principal subjectPrincipal = new X509Principal(proxyCert
+            X500Name subjectPrincipal = X500Name.getInstance(proxyCert
                     .getSubjectX500Principal().getEncoded());
-            @SuppressWarnings("unchecked")
-            Vector<DERObjectIdentifier> subjectDnOids = subjectPrincipal
-                    .getOIDs();
-            @SuppressWarnings("unchecked")
-            Vector<String> subjectDnValues = subjectPrincipal.getValues();
-
-            int fieldCount = subjectDnOids.size();
-            if (!subjectDnOids.get(fieldCount - 1).equals(X509Name.CN)) {
+            RDN[] subjectRDNs = subjectPrincipal.getRDNs();
+            AttributeTypeAndValue subjectStartRdnAva = subjectRDNs[subjectRDNs.length
+                    - 1].getFirst();
+            
+            if (!subjectStartRdnAva.getType().equals(RFC4519Style.cn)) {
                 return new CertificateException(
                         "Proxy must start with 'CN=', got '"
-                                + X509Name.DefaultSymbols.get(subjectDnOids
-                                        .get(fieldCount - 1)) + "="
-                                + subjectDnValues.get(fieldCount - 1) + "'!");
+                                + RFC4519Style.INSTANCE.oidToDisplayName(
+                                        subjectStartRdnAva.getType())
+                                + "=" + subjectStartRdnAva.getValue() + "'!");
             } else {
-                String cn = subjectDnValues.get(fieldCount - 1);
+                String cn = subjectStartRdnAva.getValue().toString();
                 if ("limited proxy".equals(cn) || "proxy".equals(cn)) {
                     if (!allowLegacy) {
                         return new CertificateException(
@@ -257,8 +255,6 @@ public class GsiWrappingTrustManager implements X509TrustManager {
                     }
                 }
             }
-        } catch (IOException e) {
-            return new CertificateParsingException(e);
         } catch (ClassCastException e) {
             return new CertificateParsingException(e);
         }
@@ -277,14 +273,10 @@ public class GsiWrappingTrustManager implements X509TrustManager {
             boolean prevIsLimited = false;
 
             X509Certificate cert = chain[eecCertIndex];
+            
 
-            X509Principal subjectPrincipal = new X509Principal(cert
+            X500Name subjectPrincipal = X500Name.getInstance(cert
                     .getSubjectX500Principal().getEncoded());
-            @SuppressWarnings("unchecked")
-            Vector<DERObjectIdentifier> subjectDnOids = subjectPrincipal
-                    .getOIDs();
-            @SuppressWarnings("unchecked")
-            Vector<String> subjectDnValues = subjectPrincipal.getValues();
 
             for (int i = eecCertIndex - 1; i >= 0; i--) {
                 if (prevIsLimited) {
@@ -293,14 +285,15 @@ public class GsiWrappingTrustManager implements X509TrustManager {
                 }
 
                 X509Certificate prevCert = cert;
-                X509Principal prevCertSubjectPrincipal = subjectPrincipal;
+                X500Name prevCertSubjectPrincipal = subjectPrincipal;
 
                 cert = chain[i];
-                subjectPrincipal = new X509Principal(cert
-                        .getSubjectX500Principal().getEncoded());
-                X509Principal issuerPrincipal = new X509Principal(cert
-                        .getIssuerX500Principal().getEncoded());
-
+                subjectPrincipal = X500Name.getInstance(
+                        cert.getSubjectX500Principal().getEncoded());
+                RDN[] subjectRDNs = subjectPrincipal.getRDNs();
+                
+                X500Name issuerPrincipal = X500Name.getInstance(
+                        cert.getIssuerX500Principal().getEncoded());
                 /*
                  * Verify the issuer's name.
                  */
@@ -309,32 +302,24 @@ public class GsiWrappingTrustManager implements X509TrustManager {
                             "Issuer's Subject DN doesn't match Issuer DN.");
                 }
 
-                Vector<DERObjectIdentifier> issuerDnOids = subjectDnOids;
-                Vector<String> issuerDnValues = subjectDnValues;
-
-                @SuppressWarnings("unchecked")
-                Vector<DERObjectIdentifier> uncheckedSubjectDnOids = subjectPrincipal
-                        .getOIDs();
-                @SuppressWarnings("unchecked")
-                Vector<String> uncheckedSubjectDnValues = subjectPrincipal
-                        .getValues();
-                subjectDnOids = uncheckedSubjectDnOids;
-                subjectDnValues = uncheckedSubjectDnValues;
+                RDN[] issuerRDNs = issuerPrincipal.getRDNs();
 
                 /*
                  * Verify all issuer's DN fields.
                  */
 
-                int fieldCount = subjectDnOids.size();
-                if (!subjectDnOids.get(fieldCount - 1).equals(X509Name.CN)) {
+                AttributeTypeAndValue subjectStartRdnAva = subjectRDNs[subjectRDNs.length
+                        - 1].getFirst();
+
+                if (!subjectStartRdnAva.getType().equals(RFC4519Style.cn)) {
                     return new CertificateException(
                             "Proxy must start with 'CN=', got '"
-                                    + X509Name.DefaultSymbols.get(subjectDnOids
-                                            .get(fieldCount - 1)) + "="
-                                    + subjectDnValues.get(fieldCount - 1)
+                                    + RFC4519Style.INSTANCE.oidToDisplayName(
+                                            subjectStartRdnAva.getType())
+                                    + "=" + subjectStartRdnAva.getValue()
                                     + "'!");
                 }
-                String cn = subjectDnValues.get(fieldCount - 1);
+                String cn = subjectStartRdnAva.getValue().toString();
                 if ("limited proxy".equals(cn)) {
                     prevIsLimited = true;
                 } else if (!"proxy".equals(cn)) {
@@ -343,16 +328,12 @@ public class GsiWrappingTrustManager implements X509TrustManager {
                                     + cn + "'!");
                 }
 
-                if (issuerDnOids.size() != subjectDnOids.size() - 1) {
+                if (issuerRDNs.length != subjectRDNs.length - 1) {
                     return new CertificateException(
                             "Subject DN must extend the Issuer DN by one field.");
                 }
-                for (int j = 0; j < issuerDnOids.size(); j++) {
-                    if (!issuerDnOids.get(j).equals(subjectDnOids.get(j))) {
-                        return new CertificateException(
-                                "Mismatch in Subject DN extension of Issuer DN.");
-                    }
-                    if (!issuerDnValues.get(j).equals(subjectDnValues.get(j))) {
+                for (int j = 0; j < issuerRDNs.length; j++) {
+                    if (!issuerRDNs[j].equals(subjectRDNs[j])) {
                         return new CertificateException(
                                 "Mismatch in Subject DN extension of Issuer DN.");
                     }
@@ -397,8 +378,6 @@ public class GsiWrappingTrustManager implements X509TrustManager {
             return null;
         } catch (CertificateException e) {
             return e;
-        } catch (IOException e) {
-            return new CertificateParsingException(e);
         }
     }
 
@@ -410,23 +389,20 @@ public class GsiWrappingTrustManager implements X509TrustManager {
         try {
             X509Certificate cert = chain[eecCertIndex];
 
-            X509Principal subjectPrincipal = new X509Principal(cert
-                    .getSubjectX500Principal().getEncoded());
-            @SuppressWarnings("unchecked")
-            Vector<DERObjectIdentifier> subjectDnOids = subjectPrincipal
-                    .getOIDs();
-            @SuppressWarnings("unchecked")
-            Vector<String> subjectDnValues = subjectPrincipal.getValues();
+            X500Name subjectPrincipal = X500Name
+                    .getInstance(cert.getSubjectX500Principal().getEncoded());
 
             for (int i = eecCertIndex - 1; i >= 0; i--) {
                 X509Certificate prevCert = cert;
-                X509Principal prevCertSubjectPrincipal = subjectPrincipal;
+                X500Name prevCertSubjectPrincipal = subjectPrincipal;
 
                 cert = chain[i];
-                subjectPrincipal = new X509Principal(cert
-                        .getSubjectX500Principal().getEncoded());
-                X509Principal issuerPrincipal = new X509Principal(cert
-                        .getIssuerX500Principal().getEncoded());
+                subjectPrincipal = X500Name.getInstance(
+                        cert.getSubjectX500Principal().getEncoded());
+                RDN[] subjectRDNs = subjectPrincipal.getRDNs();
+                
+                X500Name issuerPrincipal = X500Name.getInstance(
+                        cert.getIssuerX500Principal().getEncoded());
 
                 /*
                  * Check the time validity of the current certificate.
@@ -488,31 +464,24 @@ public class GsiWrappingTrustManager implements X509TrustManager {
                 /*
                  * Verifying subject.
                  */
-                Vector<DERObjectIdentifier> issuerDnOids = subjectDnOids;
-                Vector<String> issuerDnValues = subjectDnValues;
-
-                @SuppressWarnings("unchecked")
-                Vector<DERObjectIdentifier> uncheckedSubjectDnOids = subjectPrincipal
-                        .getOIDs();
-                @SuppressWarnings("unchecked")
-                Vector<String> uncheckedSubjectDnValues = subjectPrincipal
-                        .getValues();
-                subjectDnOids = uncheckedSubjectDnOids;
-                subjectDnValues = uncheckedSubjectDnValues;
+                RDN[] issuerRDNs = issuerPrincipal.getRDNs();
 
                 /*
                  * Verify all issuer's DN fields.
                  */
-                int fieldCount = subjectDnOids.size();
-                if (!subjectDnOids.get(fieldCount - 1).equals(X509Name.CN)) {
+
+                AttributeTypeAndValue subjectStartRdnAva = subjectRDNs[subjectRDNs.length
+                        - 1].getFirst();
+
+                if (!subjectStartRdnAva.getType().equals(RFC4519Style.cn)) {
                     return new CertificateException(
                             "Proxy must start with 'CN=', got '"
-                                    + X509Name.DefaultSymbols.get(subjectDnOids
-                                            .get(fieldCount - 1)) + "="
-                                    + subjectDnValues.get(fieldCount - 1)
+                                    + RFC4519Style.INSTANCE.oidToDisplayName(
+                                            subjectStartRdnAva.getType())
+                                    + "=" + subjectStartRdnAva.getValue()
                                     + "'!");
                 }
-                String cn = subjectDnValues.get(fieldCount - 1);
+                String cn = subjectStartRdnAva.getValue().toString();
                 BigInteger bi = null;
                 try {
                     bi = new BigInteger(cn);
@@ -524,16 +493,12 @@ public class GsiWrappingTrustManager implements X509TrustManager {
                                     + cn + "'!");
                 }
 
-                if (issuerDnOids.size() != subjectDnOids.size() - 1) {
+                if (issuerRDNs.length != subjectRDNs.length - 1) {
                     return new CertificateException(
                             "Subject DN must extend the Issuer DN by one field.");
                 }
-                for (int j = 0; j < issuerDnOids.size(); j++) {
-                    if (!issuerDnOids.get(j).equals(subjectDnOids.get(j))) {
-                        return new CertificateException(
-                                "Mismatch in Subject DN extension of Issuer DN.");
-                    }
-                    if (!issuerDnValues.get(j).equals(subjectDnValues.get(j))) {
+                for (int j = 0; j < issuerRDNs.length; j++) {
+                    if (!issuerRDNs[j].equals(subjectRDNs[j])) {
                         return new CertificateException(
                                 "Mismatch in Subject DN extension of Issuer DN.");
                     }
@@ -556,7 +521,7 @@ public class GsiWrappingTrustManager implements X509TrustManager {
 
                     ASN1InputStream asn1InputStream = new ASN1InputStream(
                             proxyCertInfoExtension);
-                    DERObject derObject;
+                    ASN1Primitive derObject;
                     try {
                         derObject = asn1InputStream.readObject();
                     } finally {
@@ -609,7 +574,7 @@ public class GsiWrappingTrustManager implements X509TrustManager {
                                  * The first element is mandatory and it must be
                                  * an OBJECT IDENTIFIER (policyLanguage).
                                  */
-                                if (!(proxyPolicyObj instanceof DERObjectIdentifier)) {
+                                if (!(proxyPolicyObj instanceof ASN1ObjectIdentifier)) {
                                     return new CertificateException(
                                             "Invalid Pre-RFC ProxyCertInfo extension in this certificate.");
                                 }
@@ -643,8 +608,8 @@ public class GsiWrappingTrustManager implements X509TrustManager {
                              * The first element of this sequence may be an
                              * INTEGER, in which case it's pCPathLenConstraint.
                              */
-                            if (proxyCertInfoObj instanceof DERInteger) {
-                                DERInteger pCPathLenConstraint = (DERInteger) proxyCertInfoObj;
+                            if (proxyCertInfoObj instanceof ASN1Integer) {
+                                ASN1Integer pCPathLenConstraint = (ASN1Integer) proxyCertInfoObj;
                                 BigInteger pathLength = pCPathLenConstraint
                                         .getValue();
                                 /*
@@ -699,23 +664,20 @@ public class GsiWrappingTrustManager implements X509TrustManager {
         try {
             X509Certificate cert = chain[eecCertIndex];
 
-            X509Principal subjectPrincipal = new X509Principal(cert
-                    .getSubjectX500Principal().getEncoded());
-            @SuppressWarnings("unchecked")
-            Vector<DERObjectIdentifier> subjectDnOids = subjectPrincipal
-                    .getOIDs();
-            @SuppressWarnings("unchecked")
-            Vector<String> subjectDnValues = subjectPrincipal.getValues();
+            X500Name subjectPrincipal = X500Name
+                    .getInstance(cert.getSubjectX500Principal().getEncoded());
 
             for (int i = eecCertIndex - 1; i >= 0; i--) {
                 X509Certificate prevCert = cert;
-                X509Principal prevCertSubjectPrincipal = subjectPrincipal;
+                X500Name prevCertSubjectPrincipal = subjectPrincipal;
 
                 cert = chain[i];
-                subjectPrincipal = new X509Principal(cert
-                        .getSubjectX500Principal().getEncoded());
-                X509Principal issuerPrincipal = new X509Principal(cert
-                        .getIssuerX500Principal().getEncoded());
+                subjectPrincipal = X500Name.getInstance(
+                        cert.getSubjectX500Principal().getEncoded());
+                RDN[] subjectRDNs = subjectPrincipal.getRDNs();
+
+                X500Name issuerPrincipal = X500Name.getInstance(
+                        cert.getIssuerX500Principal().getEncoded());
 
                 /*
                  * Check the time validity of the current certificate.
@@ -753,23 +715,14 @@ public class GsiWrappingTrustManager implements X509TrustManager {
                             e);
                 }
 
-                Vector<DERObjectIdentifier> issuerDnOids = subjectDnOids;
-                Vector<String> issuerDnValues = subjectDnValues;
 
-                @SuppressWarnings("unchecked")
-                Vector<DERObjectIdentifier> uncheckedSubjectDnOids = subjectPrincipal
-                        .getOIDs();
-                @SuppressWarnings("unchecked")
-                Vector<String> uncheckedSubjectDnValues = subjectPrincipal
-                        .getValues();
-                subjectDnOids = uncheckedSubjectDnOids;
-                subjectDnValues = uncheckedSubjectDnValues;
+                RDN[] issuerRDNs = issuerPrincipal.getRDNs();
 
                 /*
                  * Verify that the issuer's DN isn't empty.
                  * http://www.apps.ietf.org/rfc/rfc3820.html#sec-3.1
                  */
-                if (issuerDnOids.size() <= 0) {
+                if (issuerRDNs.length == 0) {
                     return new CertificateException(
                             "Proxy must not not have empty DN!");
                 }
@@ -808,16 +761,19 @@ public class GsiWrappingTrustManager implements X509TrustManager {
                  * Verify all issuer's DN fields.
                  * http://www.apps.ietf.org/rfc/rfc3820.html#sec-3.3
                  */
-                int fieldCount = subjectDnOids.size();
-                if (!subjectDnOids.get(fieldCount - 1).equals(X509Name.CN)) {
+                
+                AttributeTypeAndValue subjectStartRdnAva = subjectRDNs[subjectRDNs.length
+                        - 1].getFirst();
+
+                if (!subjectStartRdnAva.getType().equals(RFC4519Style.cn)) {
                     return new CertificateException(
                             "Proxy must start with 'CN=', got '"
-                                    + X509Name.DefaultSymbols.get(subjectDnOids
-                                            .get(fieldCount - 1)) + "="
-                                    + subjectDnValues.get(fieldCount - 1)
+                                    + RFC4519Style.INSTANCE.oidToDisplayName(
+                                            subjectStartRdnAva.getType())
+                                    + "=" + subjectStartRdnAva.getValue()
                                     + "'!");
                 }
-                String cn = subjectDnValues.get(fieldCount - 1);
+                String cn = subjectStartRdnAva.getValue().toString();
                 BigInteger bi = null;
                 try {
                     bi = new BigInteger(cn);
@@ -829,16 +785,12 @@ public class GsiWrappingTrustManager implements X509TrustManager {
                                     + cn + "'!");
                 }
 
-                if (issuerDnOids.size() != subjectDnOids.size() - 1) {
+                if (issuerRDNs.length != subjectRDNs.length - 1) {
                     return new CertificateException(
                             "Subject DN must extend the Issuer DN by one field.");
                 }
-                for (int j = 0; j < issuerDnOids.size(); j++) {
-                    if (!issuerDnOids.get(j).equals(subjectDnOids.get(j))) {
-                        return new CertificateException(
-                                "Mismatch in Subject DN extension of Issuer DN.");
-                    }
-                    if (!issuerDnValues.get(j).equals(subjectDnValues.get(j))) {
+                for (int j = 0; j < issuerRDNs.length; j++) {
+                    if (!issuerRDNs[j].equals(subjectRDNs[j])) {
                         return new CertificateException(
                                 "Mismatch in Subject DN extension of Issuer DN.");
                     }
@@ -878,7 +830,7 @@ public class GsiWrappingTrustManager implements X509TrustManager {
 
                     ASN1InputStream asn1InputStream = new ASN1InputStream(
                             proxyCertInfoExtension);
-                    DERObject derObject;
+                    ASN1Primitive derObject;
                     try {
                         derObject = asn1InputStream.readObject();
                     } finally {
@@ -920,8 +872,8 @@ public class GsiWrappingTrustManager implements X509TrustManager {
                              * The first element of this sequence may be an
                              * INTEGER, in which case it's pCPathLenConstraint.
                              */
-                            if (proxyCertInfoObj instanceof DERInteger) {
-                                DERInteger pCPathLenConstraint = (DERInteger) proxyCertInfoObj;
+                            if (proxyCertInfoObj instanceof ASN1Integer) {
+                                ASN1Integer pCPathLenConstraint = (ASN1Integer) proxyCertInfoObj;
                                 BigInteger pathLength = pCPathLenConstraint
                                         .getValue();
                                 /*
@@ -963,7 +915,7 @@ public class GsiWrappingTrustManager implements X509TrustManager {
                                  * The first element is mandatory and it must be
                                  * an OBJECT IDENTIFIER (policyLanguage).
                                  */
-                                if (!(proxyPolicyObj instanceof DERObjectIdentifier)) {
+                                if (!(proxyPolicyObj instanceof ASN1ObjectIdentifier)) {
                                     return new CertificateException(
                                             "Invalid RFC3820 ProxyCertInfo extension in this certificate.");
                                 }

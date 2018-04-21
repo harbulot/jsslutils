@@ -1,19 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
-	<modelVersion>4.0.0</modelVersion>
-	<groupId>org.jsslutils</groupId>
-	<artifactId>jsslutils-extra-apachetomcat6</artifactId>
-	<version>1.0.8-SNAPSHOT</version>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.jsslutils</groupId>
+        <artifactId>jsslutils-root</artifactId>
+        <version>1.0.8-SNAPSHOT</version>
+        <relativePath>../..</relativePath>
+    </parent>
+    <artifactId>jsslutils-extra-apachetomcat6</artifactId>
 	<packaging>bundle</packaging>
-	<name>jSSLutils :: Extra :: SSLImplementation for Apache Tomcat 6</name>
-	<url>http://www.jsslutils.org/</url>
-	<description>SSLImplementation for Apache Tomcat 6.</description>
-	<licenses>
-		<license>
-			<name>The Apache Software License, Version 2.0</name>
-			<url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
-			<distribution>repo</distribution>
-			<comments>	      
+    <name>jSSLutils :: Extra :: SSLImplementation for Apache Tomcat 6</name>
+    <url>http://www.jsslutils.org/</url>
+    <description>SSLImplementation for Apache Tomcat 6.</description>
+    <licenses>
+        <license>
+            <name>The Apache Software License, Version 2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+            <comments>
  This is derived from the Apache Tomcat implementation:
  Copyright 1999-2010 The Apache Software Foundation.
   
@@ -22,120 +27,60 @@
 This product includes software developed by
 The Apache Software Foundation (http://www.apache.org/).
 	      </comments>
-		</license>
-	</licenses>
-	<scm>
-		<connection>scm:svn:http://jsslutils.googlecode.com/svn/trunk</connection>
-		<developerConnection>scm:svn:https://jsslutils.googlecode.com/svn/trunk</developerConnection>
-		<url>http://code.google.com/p/jsslutils/source/browse</url>
-	</scm>
-	<distributionManagement>
-		<repository>
-			<id>sonatype-nexus-staging</id>
-			<name>Nexus Release Repository</name>
-			<url>http://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
-		</repository>
-		<snapshotRepository>
-			<id>sonatype-nexus-snapshots</id>
-			<name>Sonatype Nexus Snapshots</name>
-			<url>http://oss.sonatype.org/content/repositories/snapshots</url>
-		</snapshotRepository>
-	</distributionManagement>
-	<profiles>
-		<profile>
-			<activation>
-				<property>
-					<name>performRelease</name>
-					<value>true</value>
-				</property>
-			</activation>
-			<build>
-				<plugins>
-					<plugin>
-						<groupId>org.apache.maven.plugins</groupId>
-						<artifactId>maven-gpg-plugin</artifactId>
-						<executions>
-							<execution>
-								<phase>verify</phase>
-								<goals>
-									<goal>sign</goal>
-								</goals>
-							</execution>
-						</executions>
-					</plugin>
-				</plugins>
-			</build>
-		</profile>
-	</profiles>
-	<build>
-		<plugins>
-			<plugin>
-				<artifactId>maven-compiler-plugin</artifactId>
-				<configuration>
-					<source>1.5</source>
-					<target>1.5</target>
-				</configuration>
-			</plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-release-plugin</artifactId>
-				<configuration>
-					<mavenExecutorId>forked-path</mavenExecutorId>
-				</configuration>
-			</plugin>
-			<plugin>
-				<groupId>org.apache.felix</groupId>
-				<artifactId>maven-bundle-plugin</artifactId>
-				<extensions>true</extensions>
-				<version>2.1.0</version>
-				<configuration>
-					<instructions>
-						<Bundle-SymbolicName>${project.artifactId}</Bundle-SymbolicName>
-					</instructions>
-				</configuration>
-			</plugin>
-		</plugins>
-		<resources>
-			<resource>
-				<directory>${basedir}</directory>
-				<targetPath>META-INF</targetPath>
-				<includes>
-					<include>LICENSE.txt</include>
-					<include>NOTICE.txt</include>
-				</includes>
-			</resource>
-		</resources>
-	</build>
-	<dependencies>
-		<dependency>
-			<groupId>org.apache.tomcat</groupId>
-			<artifactId>coyote</artifactId>
-			<version>6.0.26</version>
-		</dependency>
-		<dependency>
-			<groupId>org.jsslutils</groupId>
-			<artifactId>jsslutils</artifactId>
-			<version>1.0.8-SNAPSHOT</version>
-		</dependency>
-		<dependency>
-			<groupId>junit</groupId>
-			<artifactId>junit</artifactId>
-			<version>4.4</version>
-			<scope>test</scope>
-		</dependency>
-	</dependencies>
-	<developers>
-		<developer>
-			<id>bruno.harbulot</id>
-			<name>Bruno Harbulot</name>
-			<email>Bruno.Harbulot@manchester.ac.uk</email>
-			<organization>The University of Manchester</organization>
-			<organizationUrl>http://www.manchester.ac.uk/</organizationUrl>
-			<roles>
-				<role>architect</role>
-				<role>developer</role>
-			</roles>
-			<timezone>0</timezone>
-		</developer>
-	</developers>
+        </license>
+    </licenses>
+    <build>
+        <plugins>
+            <plugin>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>1.5</source>
+                    <target>1.5</target>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-release-plugin</artifactId>
+                <configuration>
+                    <mavenExecutorId>forked-path</mavenExecutorId>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.felix</groupId>
+                <artifactId>maven-bundle-plugin</artifactId>
+                <extensions>true</extensions>
+                <configuration>
+                    <instructions>
+                        <Bundle-SymbolicName>${project.artifactId}</Bundle-SymbolicName>
+                    </instructions>
+                </configuration>
+            </plugin>
+        </plugins>
+        <resources>
+            <resource>
+                <directory>${basedir}</directory>
+                <targetPath>META-INF</targetPath>
+                <includes>
+                    <include>LICENSE.txt</include>
+                    <include>NOTICE.txt</include>
+                </includes>
+            </resource>
+        </resources>
+    </build>
+    <dependencies>
+        <dependency>
+            <groupId>org.apache.tomcat</groupId>
+            <artifactId>coyote</artifactId>
+            <version>6.0.53</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jsslutils</groupId>
+            <artifactId>jsslutils</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
 </project>

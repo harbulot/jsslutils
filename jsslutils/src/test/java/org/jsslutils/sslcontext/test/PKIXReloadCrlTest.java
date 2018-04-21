@@ -35,7 +35,8 @@ POSSIBILITY OF SUCH DAMAGE.
 
 package org.jsslutils.sslcontext.test;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -74,16 +75,24 @@ import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLServerSocket;
 import javax.security.auth.x500.X500Principal;
 
+import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x509.AuthorityKeyIdentifier;
 import org.bouncycastle.asn1.x509.BasicConstraints;
 import org.bouncycastle.asn1.x509.CRLNumber;
 import org.bouncycastle.asn1.x509.CRLReason;
+import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.SubjectKeyIdentifier;
-import org.bouncycastle.asn1.x509.X509Extensions;
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
+import org.bouncycastle.cert.X509CRLHolder;
+import org.bouncycastle.cert.X509CertificateHolder;
+import org.bouncycastle.cert.X509v2CRLBuilder;
+import org.bouncycastle.cert.X509v3CertificateBuilder;
+import org.bouncycastle.cert.jcajce.JcaX509CRLConverter;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.x509.X509V2CRLGenerator;
-import org.bouncycastle.x509.X509V3CertificateGenerator;
-import org.bouncycastle.x509.extension.AuthorityKeyIdentifierStructure;
-import org.bouncycastle.x509.extension.SubjectKeyIdentifierStructure;
+import org.bouncycastle.operator.ContentSigner;
+import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.jsslutils.sslcontext.PKIXSSLContextFactory;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -120,52 +129,58 @@ public class PKIXReloadCrlTest extends MiniSslClientServer {
         }
     }
 
-    public static X509Certificate generateCertificate(X500Principal issuer,
-            X500Principal subject, PublicKey issuerPublicKey,
+    public static X509Certificate generateCertificate(X500Principal issuerPrincipal,
+            X500Principal subjectPrincipal, PublicKey issuerPublicKey,
             PrivateKey issuerPrivateKey, PublicKey subjectPublicKey)
             throws Exception {
 
-        X509V3CertificateGenerator certGenerator = new X509V3CertificateGenerator();
-        certGenerator.reset();
-
-        certGenerator.setIssuerDN(issuer);
-        certGenerator.setSubjectDN(subject);
+        X500Name subject = X500Name.getInstance(subjectPrincipal.getEncoded());
+        X500Name issuer = X500Name.getInstance(issuerPrincipal.getEncoded());
 
         Date startDate = new Date(System.currentTimeMillis());
-        certGenerator.setNotBefore(startDate);
-        Date endDate = new Date(startDate.getTime() + 365L * 24L * 60L * 60L
-                * 1000L);
-        certGenerator.setNotAfter(endDate);
+        Date endDate = new Date(
+                startDate.getTime() + 365L * 24L * 60L * 60L * 1000L);
+
+        SubjectPublicKeyInfo publicKeyInfo = SubjectPublicKeyInfo
+                .getInstance(subjectPublicKey.getEncoded());
 
         Random r = new Random();
-        certGenerator.setSerialNumber(new BigInteger(32, r));
+        X509v3CertificateBuilder certBuilder = new X509v3CertificateBuilder(
+                issuer, new BigInteger(32, r), startDate, endDate, subject,
+                publicKeyInfo);
 
-        certGenerator.setPublicKey(subjectPublicKey);
+        certBuilder.addExtension(Extension.basicConstraints, true,
+                new BasicConstraints(subject.equals(issuerPrincipal)));
+
+        JcaX509ExtensionUtils x509ExtensionUtils = new JcaX509ExtensionUtils();
+
+        AuthorityKeyIdentifier authorityKeyIdentifier = x509ExtensionUtils
+                .createAuthorityKeyIdentifier(issuerPublicKey);
+        certBuilder.addExtension(Extension.authorityKeyIdentifier, false,
+                authorityKeyIdentifier);
+
+        SubjectKeyIdentifier subjectKeyIdentifier = x509ExtensionUtils
+                .createSubjectKeyIdentifier(subjectPublicKey);
+        certBuilder.addExtension(Extension.subjectKeyIdentifier, false,
+                subjectKeyIdentifier);
+
+        String signatureAlgorithm;
         String pubKeyAlgorithm = issuerPublicKey.getAlgorithm();
         if (pubKeyAlgorithm.equals("DSA")) {
-            certGenerator.setSignatureAlgorithm("SHA1WithDSA");
+            signatureAlgorithm = "SHA256WithDSA";
         } else if (pubKeyAlgorithm.equals("RSA")) {
-            certGenerator.setSignatureAlgorithm("SHA1WithRSAEncryption");
+            signatureAlgorithm = "SHA256WithRSA";
         } else {
             RuntimeException re = new RuntimeException(
                     "Algorithm not recognised: " + pubKeyAlgorithm);
             throw re;
         }
+        ContentSigner contentSigner = new JcaContentSignerBuilder(
+                signatureAlgorithm).build(issuerPrivateKey);
+        X509CertificateHolder certHolder = certBuilder.build(contentSigner);
 
-        certGenerator.addExtension(X509Extensions.BasicConstraints, true,
-                new BasicConstraints(subject.equals(issuer)));
-
-        AuthorityKeyIdentifierStructure authorityKeyIdentifier = new AuthorityKeyIdentifierStructure(
-                issuerPublicKey);
-        certGenerator.addExtension(X509Extensions.AuthorityKeyIdentifier,
-                false, authorityKeyIdentifier);
-
-        SubjectKeyIdentifier subjectKeyIdentifier = new SubjectKeyIdentifierStructure(
-                subjectPublicKey);
-        certGenerator.addExtension(X509Extensions.SubjectKeyIdentifier, false,
-                subjectKeyIdentifier);
-
-        X509Certificate cert = certGenerator.generate(issuerPrivateKey);
+        X509Certificate cert = new JcaX509CertificateConverter()
+                .getCertificate(certHolder);
 
         cert.verify(issuerPublicKey);
 
@@ -174,52 +189,58 @@ public class PKIXReloadCrlTest extends MiniSslClientServer {
 
     public static long crlNumber = 1L;
 
-    public static X509CRL generateCRL(X500Principal issuer,
+    public static X509CRL generateCRL(X500Principal issuerPrincipal,
             Collection<BigInteger> revokedSerialNumbers,
             PublicKey issuerPublicKey, PrivateKey issuerPrivateKey)
             throws Exception {
 
-        X509V2CRLGenerator crlGenerator = new X509V2CRLGenerator();
-        crlGenerator.reset();
-
-        crlGenerator.setIssuerDN(issuer);
-
         Date startDate = new Date(System.currentTimeMillis());
-        crlGenerator.setThisUpdate(startDate);
         Date endDate = new Date(startDate.getTime() + 24L * 60L * 60L * 1000L);
-        crlGenerator.setNextUpdate(endDate);
 
-        String keyAlgorithm = issuerPrivateKey.getAlgorithm();
-        if (keyAlgorithm.equals("DSA")) {
-            crlGenerator.setSignatureAlgorithm("SHA1WithDSA");
-        } else if (keyAlgorithm.equals("RSA")) {
-            crlGenerator.setSignatureAlgorithm("SHA1WithRSAEncryption");
-        } else {
-            RuntimeException re = new RuntimeException(
-                    "Algorithm not recognised: " + keyAlgorithm);
-            throw re;
-        }
+        X500Name issuer = X500Name.getInstance(issuerPrincipal.getEncoded());
+        X509v2CRLBuilder crlBuilder = new X509v2CRLBuilder(issuer, startDate);
+        crlBuilder.setNextUpdate(endDate);
 
         for (BigInteger serialNum : revokedSerialNumbers) {
-            crlGenerator.addCRLEntry(serialNum, startDate,
-                    CRLReason.unspecified);
+            crlBuilder.addCRLEntry(serialNum, startDate, CRLReason.unspecified);
         }
 
-        crlGenerator.addExtension(X509Extensions.AuthorityKeyIdentifier, false,
-                new AuthorityKeyIdentifierStructure(issuerPublicKey));
-        crlGenerator.addExtension(X509Extensions.CRLNumber, false,
+        JcaX509ExtensionUtils x509ExtensionUtils = new JcaX509ExtensionUtils();
+        
+        AuthorityKeyIdentifier authorityKeyIdentifier = x509ExtensionUtils
+                .createAuthorityKeyIdentifier(issuerPublicKey);
+        crlBuilder.addExtension(Extension.authorityKeyIdentifier, false,
+                authorityKeyIdentifier);
+        crlBuilder.addExtension(Extension.cRLNumber, false,
                 new CRLNumber(BigInteger.valueOf(crlNumber++)));
 
-        X509CRL crl = crlGenerator.generate(issuerPrivateKey);
+
+        String signatureAlgorithm;
+        String pubKeyAlgorithm = issuerPublicKey.getAlgorithm();
+        if (pubKeyAlgorithm.equals("DSA")) {
+            signatureAlgorithm = "SHA256WithDSA";
+        } else if (pubKeyAlgorithm.equals("RSA")) {
+            signatureAlgorithm = "SHA256WithRSA";
+        } else {
+            RuntimeException re = new RuntimeException(
+                    "Algorithm not recognised: " + pubKeyAlgorithm);
+            throw re;
+        }
+        ContentSigner contentSigner = new JcaContentSignerBuilder(
+                signatureAlgorithm).build(issuerPrivateKey);
+        X509CRLHolder crlHolder = crlBuilder.build(contentSigner);
+
+        X509CRL crl = new JcaX509CRLConverter().getCRL(crlHolder);
 
         crl.verify(issuerPublicKey);
 
         CertificateFactory cf = CertificateFactory.getInstance("X.509");
-        return (X509CRL) cf.generateCRL(new ByteArrayInputStream(crl
-                .getEncoded()));
+        return (X509CRL) cf
+                .generateCRL(new ByteArrayInputStream(crl.getEncoded()));
     }
 
-    public synchronized static InputStream getCrlInputStream() throws Exception {
+    public synchronized static InputStream getCrlInputStream()
+            throws Exception {
         return new ByteArrayInputStream(crl.getEncoded());
     }
 
@@ -232,7 +253,8 @@ public class PKIXReloadCrlTest extends MiniSslClientServer {
         keyPair = kpg.genKeyPair();
         caPublicKey = keyPair.getPublic();
         caPrivateKey = keyPair.getPrivate();
-        caName = new X500Principal("CN=Root CA, O=Test Certification Authority");
+        caName = new X500Principal(
+                "CN=Root CA, O=Test Certification Authority");
         caCertificate = generateCertificate(caName, caName, caPublicKey,
                 caPrivateKey, caPublicKey);
         caKeyStore = KeyStore.getInstance(KeyStore.getDefaultType());
@@ -326,9 +348,9 @@ public class PKIXReloadCrlTest extends MiniSslClientServer {
     }
 
     @Override
-    public Collection<X509CRL> getLocalCRLs() throws IOException,
-            NoSuchAlgorithmException, KeyStoreException, CertificateException,
-            CRLException {
+    public Collection<X509CRL> getLocalCRLs()
+            throws IOException, NoSuchAlgorithmException, KeyStoreException,
+            CertificateException, CRLException {
         return crls;
     }
 
@@ -380,9 +402,9 @@ public class PKIXReloadCrlTest extends MiniSslClientServer {
     @Test
     public void testWithNonEmptyCrl() throws Exception {
         this.crls.clear();
-        this.crls.add(generateCRL(caName,
-                Arrays.asList(new BigInteger[] { client2Certificate
-                        .getSerialNumber() }), caPublicKey, caPrivateKey));
+        this.crls.add(generateCRL(caName, Arrays.asList(
+                new BigInteger[] { client2Certificate.getSerialNumber() }),
+                caPublicKey, caPrivateKey));
 
         serverSSLContextFactory = new PKIXSSLContextFactory(serverKeyStore,
                 MiniSslClientServer.KEYSTORE_PASSWORD, caKeyStore, true);
@@ -395,9 +417,9 @@ public class PKIXReloadCrlTest extends MiniSslClientServer {
         assertTrue(runTest());
 
         this.crls.clear();
-        this.crls.add(generateCRL(caName,
-                Arrays.asList(new BigInteger[] { client2Certificate
-                        .getSerialNumber() }), caPublicKey, caPrivateKey));
+        this.crls.add(generateCRL(caName, Arrays.asList(
+                new BigInteger[] { client2Certificate.getSerialNumber() }),
+                caPublicKey, caPrivateKey));
         clientSSLContextFactory = new PKIXSSLContextFactory(client2KeyStore,
                 MiniSslClientServer.KEYSTORE_PASSWORD, caKeyStore, true);
         clientSSLContextFactory.addCrlCollection(getLocalCRLs());
@@ -427,9 +449,9 @@ public class PKIXReloadCrlTest extends MiniSslClientServer {
         assertTrue("Loaded keystore", true);
         assertTrue(runTest());
 
-        crl = generateCRL(caName,
-                Arrays.asList(new BigInteger[] { client2Certificate
-                        .getSerialNumber() }), caPublicKey, caPrivateKey);
+        crl = generateCRL(caName, Arrays.asList(
+                new BigInteger[] { client2Certificate.getSerialNumber() }),
+                caPublicKey, caPrivateKey);
         synchronized (PKIXReloadCrlTest.class) {
             PKIXReloadCrlTest.crl = crl;
         }
@@ -468,9 +490,9 @@ public class PKIXReloadCrlTest extends MiniSslClientServer {
         assertTrue("Loaded keystore", true);
         assertTrue(runTest());
 
-        crl = generateCRL(caName,
-                Arrays.asList(new BigInteger[] { client2Certificate
-                        .getSerialNumber() }), caPublicKey, caPrivateKey);
+        crl = generateCRL(caName, Arrays.asList(
+                new BigInteger[] { client2Certificate.getSerialNumber() }),
+                caPublicKey, caPrivateKey);
         synchronized (PKIXReloadCrlTest.class) {
             PKIXReloadCrlTest.crl = crl;
         }
@@ -488,7 +510,8 @@ public class PKIXReloadCrlTest extends MiniSslClientServer {
     }
 
     @Test
-    public void testWithRemoteCrlReloadedSameListeningSocket() throws Exception {
+    public void testWithRemoteCrlReloadedSameListeningSocket()
+            throws Exception {
         X509CRL crl = generateCRL(caName, Arrays.asList(new BigInteger[] {}),
                 caPublicKey, caPrivateKey);
         synchronized (PKIXReloadCrlTest.class) {
@@ -548,8 +571,8 @@ public class PKIXReloadCrlTest extends MiniSslClientServer {
                     }
                 }
                 System.out.println();
-                System.out.println("Server request exception: "
-                        + serverRequestException);
+                System.out.println(
+                        "Server request exception: " + serverRequestException);
                 System.out.println("Client exception: " + clientException);
                 System.out.println("Listening server exception: "
                         + this.listeningServerException);
@@ -585,8 +608,8 @@ public class PKIXReloadCrlTest extends MiniSslClientServer {
                     }
                 }
                 System.out.println();
-                System.out.println("Server request exception: "
-                        + serverRequestException);
+                System.out.println(
+                        "Server request exception: " + serverRequestException);
                 System.out.println("Client exception: " + clientException);
                 System.out.println("Listening server exception: "
                         + this.listeningServerException);
@@ -597,10 +620,10 @@ public class PKIXReloadCrlTest extends MiniSslClientServer {
                 /*
                  * Re-set the CRL.
                  */
-                crl = generateCRL(caName, Arrays
-                        .asList(new BigInteger[] { client2Certificate
-                                .getSerialNumber() }), caPublicKey,
-                        caPrivateKey);
+                crl = generateCRL(caName,
+                        Arrays.asList(new BigInteger[] {
+                                client2Certificate.getSerialNumber() }),
+                        caPublicKey, caPrivateKey);
                 synchronized (PKIXReloadCrlTest.class) {
                     PKIXReloadCrlTest.crl = crl;
                 }
@@ -634,8 +657,8 @@ public class PKIXReloadCrlTest extends MiniSslClientServer {
                     }
                 }
                 System.out.println();
-                System.out.println("Server request exception: "
-                        + serverRequestException);
+                System.out.println(
+                        "Server request exception: " + serverRequestException);
                 System.out.println("Client exception: " + clientException);
                 System.out.println("Listening server exception: "
                         + this.listeningServerException);
@@ -671,8 +694,8 @@ public class PKIXReloadCrlTest extends MiniSslClientServer {
                     }
                 }
                 System.out.println();
-                System.out.println("Server request exception: "
-                        + serverRequestException);
+                System.out.println(
+                        "Server request exception: " + serverRequestException);
                 System.out.println("Client exception: " + clientException);
                 System.out.println("Listening server exception: "
                         + this.listeningServerException);
