@@ -34,7 +34,7 @@ POSSIBILITY OF SUCH DAMAGE.
 -----------------------------------------------------------------------*/
 package org.jsslutils.sslcontext.test;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.fail;
 
 import java.net.URL;
 
@@ -46,6 +46,8 @@ import org.jsslutils.sslcontext.DefaultSSLContextFactory;
 import org.jsslutils.sslcontext.PKIXSSLContextFactory;
 import org.jsslutils.sslcontext.SSLContextFactory;
 import org.jsslutils.sslcontext.X509SSLContextFactory;
+import org.junit.Assume;
+import org.junit.Before;
 import org.junit.Test;
 
 /**
@@ -54,8 +56,10 @@ import org.junit.Test;
  * 
  */
 public class DefaultStoreTest {
-    public final static String KNOWN_CA_URL = "https://jsslutils.googlecode.com/";
-    public final static String UNKNOWN_CA_URL = "https://ca.grid-support.ac.uk/";
+    public final static String KNOWN_CA_URL = System
+            .getProperty("jsslutils.test.known_ca_url");
+    public final static String UNKNOWN_CA_URL = System
+            .getProperty("jsslutils.test.unknown_ca_url");
 
     public void connect(SSLContext sslContext, String address) throws Exception {
         URL url = new URL(address);
@@ -66,6 +70,11 @@ public class DefaultStoreTest {
         }
         connection.connect();
         connection.disconnect();
+    }
+    
+    @Before
+    public void setUp() {
+        Assume.assumeTrue(KNOWN_CA_URL != null && UNKNOWN_CA_URL != null);
     }
 
     @Test

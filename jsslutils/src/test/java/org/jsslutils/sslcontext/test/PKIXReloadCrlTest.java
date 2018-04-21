@@ -302,7 +302,7 @@ public class PKIXReloadCrlTest extends MiniSslClientServer {
     public static void setupUrlHandler() {
         URLStreamHandlerFactory mockStreamHandlerFactory = new URLStreamHandlerFactory() {
             public URLStreamHandler createURLStreamHandler(String protocol) {
-                if ("http".equals(protocol) || "https".equals(protocol)) {
+                if ("http".equals(protocol)) {
                     return new URLStreamHandler() {
                         @Override
                         protected URLConnection openConnection(final URL u)
