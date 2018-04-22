@@ -19,22 +19,49 @@
         <developerConnection>scm:git:ssh://github.com:jsslutils/jsslutils.git</developerConnection>
         <url>http://github.com/jsslutils/jsslutils/tree/master</url>
     </scm>
+    
     <licenses>
         <license>
             <comments>Please see individual modules</comments>
         </license>
     </licenses>
+
+    <distributionManagement>
+        <snapshotRepository>
+            <id>ossrh</id>
+            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+        </snapshotRepository>
+    </distributionManagement>
+    
     <profiles>
         <profile>
-            <id>release-sign-artifacts</id>
-            <activation>
-                <property>
-                    <name>performRelease</name>
-                    <value>true</value>
-                </property>
-            </activation>
+            <id>release</id>
             <build>
                 <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <goals>
+                                    <goal>jar-no-fork</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>attach-javadocs</id>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-gpg-plugin</artifactId>
@@ -52,6 +79,7 @@
             </build>
         </profile>
     </profiles>
+    
     <build>
         <plugins>
             <plugin>
@@ -66,6 +94,16 @@
                 <artifactId>maven-release-plugin</artifactId>
                 <configuration>
                     <mavenExecutorId>forked-path</mavenExecutorId>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.sonatype.plugins</groupId>
+                <artifactId>nexus-staging-maven-plugin</artifactId>
+                <extensions>true</extensions>
+                <configuration>
+                    <serverId>ossrh</serverId>
+                    <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+                    <autoReleaseAfterClose>false</autoReleaseAfterClose>
                 </configuration>
             </plugin>
         </plugins>
@@ -96,6 +134,16 @@
                     <version>1.6</version>
                 </plugin>
                 <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-source-plugin</artifactId>
+                    <version>2.2.1</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-javadoc-plugin</artifactId>
+                    <version>2.9.1</version>
+                </plugin>
+                <plugin>
                     <groupId>org.apache.felix</groupId>
                     <artifactId>maven-bundle-plugin</artifactId>
                     <version>2.1.0</version>
@@ -105,9 +153,15 @@
                     <artifactId>findbugs-maven-plugin</artifactId>
                     <version>1.2</version>
                 </plugin>
+                <plugin>
+                    <groupId>org.sonatype.plugins</groupId>
+                    <artifactId>nexus-staging-maven-plugin</artifactId>
+                    <version>1.6.7</version>
+                </plugin>
             </plugins>
         </pluginManagement>
     </build>
+    
     <modules>
         <module>jsslutils</module>
         <module>certificates</module>
@@ -116,6 +170,7 @@
         <module>extra/apachetomcat6</module>
         <module>testhelpers</module>
     </modules>
+    
     <developers>
         <developer>
             <id>bruno.harbulot</id>
@@ -128,6 +183,7 @@
             <timezone>0</timezone>
         </developer>
     </developers>
+    
     <dependencyManagement>
         <dependencies>
             <dependency>
