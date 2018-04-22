@@ -221,9 +221,9 @@ public class SslContextedSecureProtocolSocketFactory implements
      *            the host name/IP
      * @param port
      *            the port on the host
-     * @param clientHost
+     * @param localAddress
      *            the local host name/IP to bind the socket to
-     * @param clientPort
+     * @param localPort
      *            the port on the local machine
      * @param params
      *            {@link HttpConnectionParams Http connection parameters}

@@ -376,7 +376,7 @@ public abstract class MiniSslClientServer {
     }
 
     /**
-     * @param sslClientSocketFactory
+     * @param sslClientContext
      * @throws IOException
      */
     protected Exception makeClientRequest(SSLContext sslClientContext)
@@ -493,7 +493,7 @@ public abstract class MiniSslClientServer {
      * @param prefix
      * @param sslException
      * @param socket
-     * @return
+     * @return possible exception or throwable.
      */
     protected Throwable printSslException(String prefix,
             SSLException sslException, SSLSocket socket) {

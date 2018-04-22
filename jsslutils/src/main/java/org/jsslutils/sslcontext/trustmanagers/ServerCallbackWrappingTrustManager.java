@@ -82,11 +82,6 @@ public class ServerCallbackWrappingTrustManager implements X509TrustManager {
      *            X509TrustManager to wrap.
      * @param callback
      *            {@link CheckServerTrustedCallback} from the user-interface.
-     * @param localTrustStore
-     *            {@link KeyStore} to use as a trust store.
-     * @param saveLocalTrustStore
-     *            Set to true to save the keystore, otherwise, it will only be
-     *            kept in memory.
      * @throws KeyStoreException
      * @throws IOException
      * @throws CertificateException
