@@ -4,7 +4,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.jsslutils</groupId>
     <artifactId>jsslutils-root</artifactId>
-    <version>1.0.8-SNAPSHOT</version>
+    <version>1.0.8</version>
     <packaging>pom</packaging>
     <name>jSSLutils (Root project)</name>
     <url>http://www.jsslutils.org/</url>
@@ -202,7 +202,7 @@
             <dependency>
                 <groupId>org.jsslutils</groupId>
                 <artifactId>jsslutils-test-certificates</artifactId>
-                <version>2.0.8-SNAPSHOT</version>
+                <version>2.0.8</version>
             </dependency>
             <dependency>
                 <groupId>junit</groupId>
